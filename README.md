@@ -38,12 +38,12 @@ Hem implementat i documentat fluxos essencials com:
 Aquest repositori inclou:
 
 * Fitxers `docker-compose.yml` per a cada servei.
-* Guia de configuració (enllaç a la memòria del TFG per a més detall).
+* Guia de configuració (enllaç a la memòria del TFG).
 * Exemples de configuració de Traefik.
 
 
 ## ✉️ Contacte
 
-Si tens preguntes o vols col·laborar, no dubtis en contactar amb nosaltres a opendxp.net
+Si tens preguntes o vols col·laborar, no dubtis en contactar amb nosaltres a http://www.opendxp.net
 
 ---
