@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  mariadb-suitecrm:
+    image: bitnami/mariadb:latest
+    container_name: mariadb_suitecrm
+    restart: unless-stopped
+    networks:
+      - suitecrm_internal_net # Xarxa interna per a aquests dos serveis
+    volumes:
+      - suitecrm_db_data:/bitnami/mariadb/data 
+    environment:
+      - MARIADB_ROOT_PASSWORD=contrasenya_XXXX
+      - MARIADB_USER=XXXX
+      - MARIADB_PASSWORD=contrasenya_XXXX
+      - MARIADB_DATABASE=suitecrm_db        
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost", "-u$$MARIADB_USER", "-p$$MARIADB_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  suitecrm:
+    image: bitnami/suitecrm:latest
+    container_name: suitecrm_app
+    restart: unless-stopped
+    depends_on:
+      mariadb-suitecrm:
+        condition: service_healthy # Espera que la BD estigui llesta
+    networks:
+      - suitecrm_internal_net    # Per parlar amb la seva BD
+      - traefik-public           # Perquè Traefik el pugui trobar
+    volumes:
+      - suitecrm_data:/bitnami/suitecrm
+    environment:
+      - SUITECRM_DATABASE_HOST=mariadb-suitecrm # Nom del servei de la BD dins d'aquest mateix fitxer
+      - SUITECRM_DATABASE_USER=XXXX    # El mateix que de dalt per a MariaDB
+      - SUITECRM_DATABASE_PASSWORD=contrasenya_XXXX # La mateixa que a dalt
+      - SUITECRM_DATABASE_NAME=suitecrm_db # El mateix que a dalt
+      - SUITECRM_HOST=URL # Indicar URL on està instal·lat SuiteCRM
+      - TZ=Europe/Madrid # zona horària
+    labels:
+      - "traefik.enable=true"
+      # Router principal per HTTPS
+      - "traefik.http.routers.suitecrm-secure.rule=Host(`URL`)"                      # Indicar URL on està instal·lat SuiteCRM
+      - "traefik.http.routers.suitecrm-secure.entrypoints=websecure"
+      - "traefik.http.routers.suitecrm-secure.tls.certresolver=myresolver"           # El nom del resolver de Traefik
+      - "traefik.http.services.suitecrm-app-service.loadbalancer.server.port=8080"   # Port intern de SuiteCRM
+      # Router per a redirecció HTTP a HTTPS
+      - "traefik.http.routers.suitecrm-http.rule=Host(`URL`)"                        # Indicar URL on està instal·lat SuiteCRM
+      - "traefik.http.routers.suitecrm-http.entrypoints=web"
+      - "traefik.http.routers.suitecrm-http.middlewares=redirect-to-https@docker"    # Middleware de Traefik per a la redirecció
+
+volumes:
+  suitecrm_db_data:
+    external: true
+  suitecrm_data:
+    external: true
+
+networks:
+  traefik-public:
+    external: true          # Indica que aquesta xarxa ja existeix (creada per Traefik)
+  suitecrm_internal_net:    # Xarxa interna per a la comunicació entre aquests serveis de SuiteCRM
+    driver: bridge

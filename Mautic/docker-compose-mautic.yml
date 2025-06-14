@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  mariadb-mautic:
+    image: mariadb:latest
+    container_name: mariadb_mautic
+    restart: unless-stopped
+    networks:
+      - mautic_internal_net
+    volumes:
+      - mautic_db_data:/var/lib/mysql 
+    environment:
+      - MARIADB_ROOT_PASSWORD=contrasenya_XXXX
+      - MARIADB_USER=XXXX
+      - MARIADB_PASSWORD=contrasenya_XXXX
+      - MARIADB_DATABASE=mautic_db
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost", "-u$$MARIADB_USER", "-p$$MARIADB_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mautic:
+    image: mautic/mautic:latest
+    container_name: mautic_app
+    restart: unless-stopped
+    depends_on:
+      mariadb-mautic:
+        condition: service_healthy
+    networks:
+      - mautic_internal_net
+      - traefik-public
+    volumes:
+      - mautic_data:/var/www/html
+    environment:
+      # Variables de connexió a la BD
+      - MAUTIC_DB_HOST=mariadb-mautic # Nom del servei de la BD dins d'aquest fitxer
+      - MAUTIC_DB_USER=XXXX # El mateix que a dalt per a MariaDB
+      - MAUTIC_DB_PASSWORD=contrasenya_XXXX # La mateixa que a dalt
+      - MAUTIC_DB_NAME=mautic_db # El mateix que a dalt
+
+      # Altres variables importants per a Mautic
+      - MAUTIC_TRUSTED_PROXIES=["0.0.0.0/0"] # Important quan s'executa darrere un reverse proxy com Traefik
+      - MAUTIC_SITE_URL=url_mautic # Indcar la URL on está mautic instal·lat 
+      - MAUTIC_RUN_CRON_JOBS=true # Recomanat per al funcionament correcte de Mautic
+      - TZ=Europe/Madrid # la zona horària
+    labels:
+      - "traefik.enable=true"
+      # Router principal per HTTPS
+      - "traefik.http.routers.mautic-secure.rule=Host(`url_mautic`)"
+      - "traefik.http.routers.mautic-secure.entrypoints=websecure"
+      - "traefik.http.routers.mautic-secure.tls.certresolver=myresolver"
+      - "traefik.http.services.mautic-app-service.loadbalancer.server.port=80" # Port intern de Mautic
+      # Router per a redirecció HTTP a HTTPS
+      - "traefik.http.routers.mautic-http.rule=Host(`url_mautic`)"
+      - "traefik.http.routers.mautic-http.entrypoints=web"
+      - "traefik.http.routers.mautic-http.middlewares=redirect-to-https@docker"
+
+volumes:
+  mautic_db_data:
+    external: true
+  mautic_data:
+    external: true
+
+networks:
+  traefik-public:
+    external: true
+  mautic_internal_net:
+    driver: bridge

@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  mariadb-wp:
+    image: mariadb:latest
+    container_name: mariadb_wp
+    restart: unless-stopped
+    networks:
+      - wordpress_internal_net
+    volumes:
+      - wordpress_db_data:/var/lib/mysql 
+    environment:
+      - MARIADB_ROOT_PASSWORD=contrasenya_XXXX
+      - MARIADB_USER=XXXX
+      - MARIADB_PASSWORD=# Indicar URL on està instal·lat SuiteCRM
+      - MARIADB_DATABASE=wordpress_db
+
+  wordpress:
+    image: wordpress:latest
+    container_name: wordpress_app
+    restart: unless-stopped
+    depends_on:
+      - mariadb-wp # Espera que la BD s'iniciï primer
+    networks:
+      - wordpress_internal_net_dc
+      - traefik-public
+    volumes:
+      - wordpress_data:/var/www/html
+    environment:
+      - WORDPRESS_DB_HOST=mariadb-wp:3306 # Nom del servei de la BD i el seu port
+      - WORDPRESS_DB_USER=XXXX # El mateix que a dalt per a MariaDB
+      - WORDPRESS_DB_PASSWORD=contrasenya_XXXX # La mateixa que a dalt
+      - WORDPRESS_DB_NAME=wordpress_db # El mateix que a dalt
+      - WORDPRESS_TABLE_PREFIX=wp_ 
+    labels:
+      - "traefik.enable=true"
+      # Router principal per HTTPS
+      - "traefik.http.routers.wordpress-secure.rule=Host(`URL`)" # Indicar URL on està instal·lat WP
+      - "traefik.http.routers.wordpress-secure.entrypoints=websecure"
+      - "traefik.http.routers.wordpress-secure.tls.certresolver=myresolver"
+      - "traefik.http.services.wordpress-app-service.loadbalancer.server.port=80" # Port intern de WordPress
+      # Router per a redirecció HTTP a HTTPS
+      - "traefik.http.routers.wordpress-http.rule=Host(`URL`)" # Indicar URL on està instal·lat WP
+      - "traefik.http.routers.wordpress-http.entrypoints=web"
+      - "traefik.http.routers.wordpress-http.middlewares=redirect-to-https@docker"
+
+volumes:
+  wordpress_db_data:
+    external: true
+  wordpress_data:
+    external: true
+
+networks:
+  traefik-public:
+    external: true
+  wordpress_internal_net:
+    driver: bridge

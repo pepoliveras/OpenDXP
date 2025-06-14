@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  n8n:
+    image: n8nio/n8n:latest 
+    container_name: n8n_app 
+    restart: unless-stopped
+    networks:
+      - traefik-public # Perquè Traefik el pugui trobar
+    volumes:
+      - n8n_data:/home/node/.n8n
+    environment:
+      - GENERIC_TIMEZONE=Europe/Madrid # zona horària
+
+      # Variables IMPORTANTS per a n8n darrere un reverse proxy com Traefik:
+      - N8N_PROTOCOL=https
+      - N8N_HOST=url_n8n # URL on està instal·lat n8n
+      # La WEBHOOK_URL hauria de ser la URL base pública per als webhooks.
+      # Si els teus webhooks són a la ruta principal, seria igual que N8N_HOST.
+      - WEBHOOK_URL=url_mautic # URL on està instal·lat n8n
+      # - N8N_PORT=5678 (encara que la imatge ja utilitza aquest per defecte internament)
+      # - N8N_USER_FOLDER=/home/node/.n8n (ja és el valor per defecte)
+      # ... altres variables específiques de n8n que tinguessis ...
+    labels:
+      - "traefik.enable=true"
+      # Router principal per HTTPS
+      - "traefik.http.routers.n8n-secure.rule=Host(`# URL on està instal·lat n8n`)" 
+      - "traefik.http.routers.n8n-secure.entrypoints=websecure"
+      - "traefik.http.routers.n8n-secure.tls.certresolver=myresolver"           # El  resolver de Traefik
+      - "traefik.http.services.n8n-app-service.loadbalancer.server.port=5678"   # Port intern de n8n
+
+      # Router per a redirecció HTTP a HTTPS
+      - "traefik.http.routers.n8n-http.rule=Host(`# URL on està instal·lat n8n`)" 
+      - "traefik.http.routers.n8n-http.entrypoints=web"
+      - "traefik.http.routers.n8n-http.middlewares=redirect-to-https@docker"
+
+volumes:
+  n8n_data: 
+    external: true
+
+networks:
+  traefik-public:
+    external: true # Indica que aquesta xarxa ja existeix

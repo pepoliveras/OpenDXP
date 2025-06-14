@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  traefik:
+    image: traefik:v2.11 
+    container_name: traefik
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - traefik-public # La xarxa que hem creat
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro # Perquè Traefik pugui escoltar els esdeveniments de Docker
+      - ~/traefik-data/letsencrypt:/letsencrypt # Per emmagatzemar els certificats SSL
+      - ~/traefik-data/traefik.yml:/etc/traefik/traefik.yml:ro # Fitxer de configuració estàtica de Traefik
+      # - ./traefik-data/traefik.log:/traefik.log # Per als logs de Traefik
+    
+    # Comandes per a la configuració dinàmica via arguments CLI (alternativa a traefik.yml)
+    command:
+      - "--api.dashboard=true" # Activa el dashboard (opcional, però útil)
+      # - "--api.insecure=true" # Per accedir al dashboard sense autenticació (NOMÉS PER DESENVOLUPAMENT LOCAL!)
+      - "--log.level=INFO" # Nivell de log (DEBUG, INFO, WARNING, ERROR)
+      - "--providers.docker=true" # Activa el proveïdor Docker
+      - "--providers.docker.exposedbydefault=false" # Només exposar contenidors amb etiqueta explícita
+      - "--providers.docker.network=traefik-public" # Especifica la xarxa a utilitzar
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure" # Redirecció HTTP a HTTPS
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--certificatesresolvers.myresolver.acme.email=el-teu-mail@mail.com" #Aquí cal introduir el correu de l'admnin
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web"
+    labels:
+      # Per accedir al dashboard de Traefik de forma segura (opcional)
+      # Assegura't que traefik.elteudomini.com apunta a la IP del teu VPS
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik-dashboard.rule=Host(`el-teu-domini.com`)" 
+      - "traefik.http.routers.traefik-dashboard.entrypoints=websecure"
+      - "traefik.http.routers.traefik-dashboard.tls.certresolver=myresolver"
+      - "traefik.http.routers.traefik-dashboard.service=api@internal"
+      # Afegeix autenticació bàsica al dashboard per seguretat
+      echo $(htpasswd -nb usuari_XXXX contrasenya_XXXX) | sed -e s/\\$/\\$\\$/g
+      - "traefik.http.routers.traefik-dashboard.middlewares=auth"
+      - "traefik.http.middlewares.auth.basicauth.users=usuari_XXXX:contrasenya_XXXX"
+
+networks:
+  traefik-public:
+    external: true # Indica que la xarxa ja existeix
