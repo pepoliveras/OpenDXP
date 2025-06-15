@@ -30,20 +30,20 @@ Dominis: Substitueix mautic.opendxp.net a la secció labels i a la variable d'en
 Credencials de la Base de Dades: Modifica les variables d'entorn (MARIADB_ROOT_PASSWORD, MAUTIC_DB_USER, etc.) per utilitzar contrasenyes segures.
 
 Iniciar el Servei: Des del directori on es troba aquest docker-compose.yml, executa la comanda:
-'''
+```
 docker-compose up -d
-'''
+```
 ### Configuració Post-Instal·lació
 Assistent de Mautic: Accedeix al teu domini (ex: https://mautic.opendxp.net). La primera vegada, Mautic et guiarà a través d'un breu assistent d'instal·lació per crear el teu usuari administrador i configurar els paràmetres bàsics de correu.
 
 Configurar Cron Jobs: Perquè Mautic funcioni correctament (actualització de segments, enviament de campanyes), és essencial configurar les tasques programades (cron jobs). Dins del contenidor, els scripts es troben a /var/www/html/bin/console. Hauràs de configurar un cron al servidor amfitrió que executi les comandes de Docker corresponents, per exemple:
 
 # Exemple de línia a afegir al crontab de l'amfitrió
-'''
+```
 */5 * * * * docker exec mautic_app php /var/www/html/bin/console mautic:segments:update
 */5 * * * * docker exec mautic_app php /var/www/html/bin/console mautic:campaigns:update
 */5 * * * * docker exec mautic_app php /var/www/html/bin/console mautic:campaigns:trigger
-'''
+```
 
 Habilitar l'API: Perquè n8n es pugui connectar, ves a Configuració (icona de l'engranatge) > Configuració > Configuració de l'API i assegura't que l'API estigui habilitada.
 
