@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  # Servei per a la Base de Dades de Moodle (MariaDB per consistència)
+  mariadb-moodle:
+    image: bitnami/mariadb:latest
+    container_name: mariadb_moodle
+    restart: unless-stopped
+    environment:
+      - MARIADB_ROOT_PASSWORD=XXXX
+      - MARIADB_USER=usr_XXXX
+      - MARIADB_PASSWORD=XXXX
+      - MARIADB_DATABASE=db_moodle
+    volumes:
+      # Volum per a les dades de la base de dades
+      - 'moodle_db_data:/bitnami/mariadb'
+    networks:
+      - moodle_internal_net
+
+  # Servei per a l'aplicació Moodle
+  moodle:
+    image: bitnami/moodle:latest
+    container_name: moodle_app
+    restart: unless-stopped
+    depends_on:
+      - mariadb-moodle # Assegura que la BD s'iniciï abans que Moodle
+    environment:
+      # Connexió a la Base de Dades
+      - MOODLE_DATABASE_HOST=mariadb-moodle
+      - MOODLE_DATABASE_USER=XXXX
+      - MOODLE_DATABASE_PASSWORD=XXXX
+      - MOODLE_DATABASE_NAME=db_moodle
+
+      # Dades de l'administrador de Moodle
+      # ATENCIÓ: Canvia aquests valors
+      - MOODLE_USERNAME=XXXX
+      - MOODLE_PASSWORD=XXXX
+      - MOODLE_EMAIL=XXXX@elteudomini.com
+
+      # Configuració del lloc Moodle (Molt Important!)
+      - MOODLE_SITE_NAME=XXXX
+      - MOODLE_SITE_URL=XXXX # URL pública final
+
+    volumes:
+      # Volum per als fitxers de l'aplicació Moodle
+      - 'moodle_app_data:/bitnami/moodle'
+      # Volum per a les dades dels cursos, fitxers d'usuaris, etc. (Molt important)
+      - 'moodle_data_files:/bitnami/moodledata'
+    networks:
+      - moodle_internal_net # Xarxa per comunicar-se amb la seva BD
+      - traefik-public      # Xarxa per ser accessible des de l'exterior via Traefik
+
+    labels:
+      # Habilitar Traefik per a aquest servei
+      - "traefik.enable=true"
+
+      # --- Router per a HTTPS (websecure) ---
+      # Regla per dirigir el trànsit basant-se en el domini
+      - "traefik.http.routers.moodle-secure.rule=Host(`moodle.opendxp.net`)"
+      # Especifica que aquest router utilitza el punt d'entrada 'websecure' (port 443)
+      - "traefik.http.routers.moodle-secure.entrypoints=websecure"
+      # Utilitza el nostre 'resolver' de certificats per obtenir SSL amb Let's Encrypt
+      - "traefik.http.routers.moodle-secure.tls.certresolver=myresolver"
+      # Defineix a quin port intern del contenidor ha d'enviar el trànsit Traefik
+      - "traefik.http.services.moodle-app-service.loadbalancer.server.port=8080"
+
+      # --- Router per a la redirecció de HTTP a HTTPS (web) ---
+      - "traefik.http.routers.moodle-http.rule=Host(`moodle.opendxp.net`)"
+      - "traefik.http.routers.moodle-http.entrypoints=web"
+      # Middleware de Traefik per gestionar la redirecció automàtica
+      - "traefik.http.routers.moodle-http.middlewares=redirect-to-https@docker"
+
+# Definició dels volums perquè Docker els gestioni i siguin persistents
+volumes:
+  moodle_db_data:
+  moodle_app_data:
+  moodle_data_files:
+
+# Definició de les xarxes
+networks:
+  traefik-public:
+    external: true # Aquesta xarxa ja existeix i és gestionada per Traefik
+  moodle_internal_net:
+    driver: bridge # Una nova xarxa interna només per a Moodle i la seva BD
