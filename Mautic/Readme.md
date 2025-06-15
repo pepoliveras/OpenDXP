@@ -1,7 +1,7 @@
-#OpenDXP - Component: Mautic
+# OpenDXP - Component: Mautic
 Aquesta carpeta conté els fitxers de configuració necessaris per desplegar Mautic, la plataforma d'automatització de màrqueting del projecte OpenDXP.
 
-##🚀 Rol dins de la Plataforma OpenDXP
+## 🚀 Rol dins de la Plataforma OpenDXP
 Mautic és el cervell de la comunicació i el nurturing (maduració) de contactes. Les seves funcions principals són:
 
 Automatització de Màrqueting: Permet crear campanyes complexes basades en el comportament de l'usuari (obertura de correus, clics, visites a pàgines).
@@ -12,17 +12,17 @@ Gestió de Comunicacions: Gestiona l'enviament de butlletins electrònics, corre
 
 Lead Scoring: Puntua els contactes segons les seves accions per identificar aquells amb més interès o potencial.
 
-##📂 Contingut de la Carpeta
+## 📂 Contingut de la Carpeta
 docker-compose-mautic.yml: Fitxer de Docker Compose per desplegar el contenidor de Mautic i la seva base de dades MariaDB.
 
-##🛠️ Instruccions d'Instal·lació i Configuració
+## 🛠️ Instruccions d'Instal·lació i Configuració
 
-###Prerequisits
+### Prerequisits
 Una instància de Traefik ja ha d'estar en funcionament.
 
 Un registre DNS de tipus A (ex: mautic.opendxp.net) ha d'apuntar a la IP pública del teu servidor.
 
-###Passos per al Desplegament
+### Passos per al Desplegament
 Personalitzar el docker-compose-mautic.yml:
 
 Dominis: Substitueix mautic.opendxp.net a la secció labels i a la variable d'entorn MAUTIC_SITE_URL pel domini que hagis escollit.
@@ -33,7 +33,7 @@ Iniciar el Servei: Des del directori on es troba aquest docker-compose.yml, exec
 
 docker-compose up -d
 
-###Configuració Post-Instal·lació
+### Configuració Post-Instal·lació
 Assistent de Mautic: Accedeix al teu domini (ex: https://mautic.opendxp.net). La primera vegada, Mautic et guiarà a través d'un breu assistent d'instal·lació per crear el teu usuari administrador i configurar els paràmetres bàsics de correu.
 
 Configurar Cron Jobs: Perquè Mautic funcioni correctament (actualització de segments, enviament de campanyes), és essencial configurar les tasques programades (cron jobs). Dins del contenidor, els scripts es troben a /var/www/html/bin/console. Hauràs de configurar un cron al servidor amfitrió que executi les comandes de Docker corresponents, per exemple:
