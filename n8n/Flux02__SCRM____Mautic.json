@@ -1,0 +1,125 @@
+{
+  "name": "Flux3: CRM-> Mautic + WP",
+  "nodes": [
+    {
+      "parameters": {
+        "multipleMethods": true,
+        "path": "canvia-aixo-per-un-path-unic",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-360, -80],
+      "id": "68491bd0-3e19-4ec8-bc25-df512380264d",
+      "name": "Webhook",
+      "webhookId": null
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://la-teva-url-de-suitecrm.com/legacy/Api/access_token",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "grant_type", "value": "client_credentials" },
+            { "name": "client_id", "value": "EL_TEU_CLIENT_ID" },
+            { "name": "client_secret", "value": "LA_TEVA_CONTRASENYA_SECRET" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-160, 20],
+      "id": "df131d7d-74fc-40b7-9268-ef12a76e083f",
+      "name": "GET SuiteCRM API Token",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "url": "=https://la-teva-url-de-suitecrm.com/legacy/Api/V8/module/Contacts/{{ $('Webhook').item.json.body.contact_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $json.access_token }}" },
+            { "name": "Accept", "value": "application/vnd.api+json" },
+            { "name": "Content-Type", "value": "application/vnd.api+json" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [80, -60],
+      "id": "ee327357-e7ae-4b70-9b19-e313c25b6ed6",
+      "name": "Get Contact from SuiteCRM"
+    },
+    {
+      "parameters": { "jsCode": "const items = $input.all();\n\nfor (const item of items) {\n  const jsonString = item.json.data;\n  const parsedData = JSON.parse(jsonString);\n  item.json.contactData = parsedData.data;\n}\n\nreturn items;\n" },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, -60],
+      "id": "23b90951-ac2b-4f24-a145-83efdaff4522",
+      "name": "Parsejar el JSON",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": { "authentication": "oAuth2", "operation": "getAll", "limit": 1, "options": { "search": "={{ $json.body.email1 }}" } },
+      "type": "n8n-nodes-base.mautic",
+      "typeVersion": 1,
+      "position": [400, -60],
+      "id": "f243479a-d8e8-4f39-b6c9-2f48cda0ec66",
+      "name": "Mautic",
+      "credentials": { "mauticOAuth2Api": { "id": "bBWRQnN3FlPKd5VK", "name": "Mautic account" } },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 }, "conditions": [ { "id": "a48d5a6c-a06d-4108-bc15-231a4b5e4249", "leftValue": "={{ $('Mautic').all().length }}", "rightValue": "={{ 0 }}", "operator": { "type": "boolean", "operation": "notEquals" } } ], "combinator": "and" }, "looseTypeValidation": true, "options": {} },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [580, -120],
+      "id": "b22734c2-294a-4de6-8ba2-f899bfca1d28",
+      "name": "If"
+    },
+    {
+      "parameters": { "fromEmail": "notificacions@elteudomini.com", "toEmail": "admin@elteudomini.com", "subject": "=ERROR en execució {{ $workflow.name }}", "html": "=Hi ha hagut un error en l'execució dins de N8N\n\n{{ $workflow.name }}\n\nBody:\n{{ $('Mautic').item.json.body }}\n{{ $('Mautic Update contact (amb email)').item.json.body }}\n{{ $('Mautic Update Contact (sense email)').item.json.body }}", "options": {} },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1260, 180],
+      "id": "75231e6e-f80c-48f3-813f-92578e272dd0",
+      "name": "Send Email",
+      "webhookId": null,
+      "credentials": { "smtp": { "id": "DqjAutnBM6baRQ5d", "name": "SMTP account" } }
+    },
+    {
+      "parameters": { "authentication": "oAuth2", "operation": "update", "contactId": "={{ $('Mautic').item.json.id }}", "updateFields": { "firstName": "={{ $('Parsejar el JSON').item.json.contactData.attributes.first_name }}", "lastName": "={{ $('Parsejar el JSON').item.json.contactData.attributes.last_name }}" }, "options": {} },
+      "type": "n8n-nodes-base.mautic",
+      "typeVersion": 1,
+      "position": [980, -60],
+      "id": "55af2ade-e213-4c39-b197-4d9a6aa35b42",
+      "name": "Mautic Update Contact (sense email)",
+      "credentials": { "mauticOAuth2Api": { "id": "bBWRQnN3FlPKd5VK", "name": "Mautic account" } },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": { "fromEmail": "notificacions@elteudomini.com", "toEmail": "admin@elteudomini.com", "subject": "=S'ha actualitzat un contacte en execució {{ $workflow.name }}", "html": "=S'ha actualitzat un contacte a MAUTIC provinent de SuiteCRM\n{{ $workflow.name }}\n\n\n<br><br>\nNom :{{ $('Parsejar el JSON').item.json.contactData.attributes.first_name }}<br>\nCognoms: {{ $('Parsejar el JSON').item.json.contactData.attributes.last_name }}<br>\nCorreu: {{ $('Parsejar el JSON').item.json.contactData.attributes.email1 }}\n\n", "options": {} },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1240, -240],
+      "id": "7c5e6c6d-d0d2-4f7f-a412-9ad58e2dce74",
+      "name": "Send Email1",
+      "webhookId": null,
+      "credentials": { "smtp": { "id": "DqjAutnBM6baRQ5d", "name": "SMTP account" } }
+    }
+  ],
+  "pinData": {},
+  "connections": {},
+  "active": false,
+  "settings": {},
+  "versionId": "96b1cf41-e398-482c-b605-9654104df5af",
+  "id": "4FL5Wcz1WDdcQaSK",
+  "tags": []
+}

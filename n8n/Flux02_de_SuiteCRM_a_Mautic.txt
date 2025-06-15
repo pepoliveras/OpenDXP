@@ -1,0 +1,131 @@
+Integració OpenDXP: Flux 3 (SuiteCRM → Mautic)
+Aquest document descriu la configuració i el funcionament del Flux 3. El seu objectiu principal és establir SuiteCRM com la font de la veritat per a les dades mestres dels contactes. Quan la informació d'un contacte s'actualitza a SuiteCRM, aquest flux de treball propaga automàticament els canvis a Mautic, garantint la consistència de les dades a tot l'ecosistema.
+
+Aquesta és una automatització crítica per al govern de les dades i per evitar la desincronització entre plataformes.
+
+Visió General del Flux
+L'objectiu d'aquest workflow és el següent:
+
+Un membre de l'equip de l'ONG modifica i desa les dades d'un contacte directament a la interfície de SuiteCRM.
+
+L'acció de desar activa un Logic Hook (un script PHP personalitzat) dins de SuiteCRM, que envia l'ID del contacte modificat a un webhook de n8n.
+
+n8n rep l'ID, s'autentica contra l'API de SuiteCRM i obté la fitxa completa i actualitzada del contacte.
+
+n8n busca el contacte corresponent a Mautic (per email).
+
+Si el contacte existeix a Mautic, n8n actualitza les seves dades (nom, cognom, etc.).
+
+Si el contacte no existeix a Mautic, n8n el crea.
+
+El flux finalitza enviant una notificació per correu electrònic informant de l'èxit de la sincronització.
+
+Prerequisits
+Abans d'implementar aquest flux, assegura't de tenir la següent configuració a punt:
+
+Instància de SuiteCRM:
+
+Una instància de SuiteCRM operativa.
+
+Accés al sistema de fitxers del servidor on s'allotja SuiteCRM per poder instal·lar el Logic Hook (fitxers PHP).
+
+Credencials de Client API (OAuth2) creades per a n8n.
+
+Instància de Mautic:
+
+Una instància de Mautic operativa amb l'API habilitada.
+
+Credencials d'API (OAuth2) creades.
+
+Instància de n8n:
+
+Una instància de n8n operativa i accessible públicament.
+
+Configuració
+La configuració d'aquest flux és més complexa, ja que requereix una part manual a SuiteCRM.
+
+Pas 1: Instal·lar el "Logic Hook" a SuiteCRM
+Aquest és el pas més crític. Has de crear dos fitxers PHP al servidor de SuiteCRM.
+
+Localitza el directori de volums de Docker: Accedeix al teu servidor i troba la ubicació del teu volum persistent de SuiteCRM amb la comanda docker volume inspect <nom_del_volum>. La ruta que necessites és la del "Mountpoint".
+
+Crea els directoris: Dins de la ruta del Mountpoint, crea la següent estructura de directoris:
+/public/legacy/custom/modules/Contacts/
+
+Crea el fitxer ContactSaveHook.php: Dins del directori anterior, crea aquest fitxer i enganxa-hi el següent codi. Recorda substituir URL_DEL_TEU_WEBHOOK_DE_N8N_AQUI per la URL real que obtindràs al següent pas.
+
+<?php
+if (!defined('sugarEntry') || !sugarEntry) die('Not A Valid Entry Point');
+
+class ContactSaveHook
+{
+    function sendToN8n(SugarBean $bean, $event, $arguments)
+    {
+        // URL del Webhook de n8n (obtinguda del node Webhook a n8n)
+        $webhook_url = 'URL_DEL_TEU_WEBHOOK_DE_N8N_AQUI';
+
+        if (empty($bean->fetched_row)) {
+            // És un contacte nou, no fem res en aquest flux.
+            return;
+        }
+
+        $post_data = json_encode(['contact_id' => $bean->id]);
+        $ch = curl_init($webhook_url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $post_data);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
+        $response = curl_exec($ch);
+        curl_close($ch);
+        $GLOBALS['log']->info("ContactSaveHook: S'ha enviat l'ID {$bean->id} a n8n. Resposta: {$response}");
+    }
+}
+
+Crea el fitxer logic_hooks.php: Al mateix directori, crea aquest fitxer per registrar el hook.
+
+<?php
+$hook_version = 1;
+$hook_array = array();
+$hook_array['after_save'] = array();
+$hook_array['after_save'][] = array(
+    1, 'Envia notificació a n8n en guardar contacte',
+    'custom/modules/Contacts/ContactSaveHook.php', 'ContactSaveHook', 'sendToN8n'
+);
+
+Reparar SuiteCRM: Ves a Administració > Reparar i executa "Quick Repair and Rebuild" perquè SuiteCRM reconegui els nous fitxers.
+
+Pas 2: Configurar i Activar el Workflow a n8n
+Importa el fitxer Flux3__SCRM____Mautic.json al teu n8n.
+
+Obre el workflow i fes clic al node Webhook.
+
+Copia la URL de Producció i enganxa-la al fitxer ContactSaveHook.php que has creat al pas anterior.
+
+Assegura't que el HTTP Method estigui configurat com a POST.
+
+Configura les credencials necessàries per a Mautic i SMTP.
+
+Finalment, activa el workflow amb l'interruptor superior esquerre i desa els canvis.
+
+Detalls del Funcionament del Workflow
+El fitxer Flux3__SCRM____Mautic.json implementa la següent lògica:
+
+Webhook: Rep la petició POST del Logic Hook de SuiteCRM, que conté l'ID del contacte modificat.
+
+GET SuiteCRM API Token (HTTP Request): Obté un access_token temporal de SuiteCRM per autenticar les següents peticions.
+
+Get Contact from SuiteCRM (HTTP Request): Utilitza el token i l'ID rebuts per demanar a l'API de SuiteCRM la fitxa completa i actualitzada del contacte.
+
+Parsejar el JSON (Code): Converteix la resposta de l'API (que és una cadena de text) en un objecte JSON manejable.
+
+Mautic (Search): Busca el contacte a Mautic utilitzant l'adreça d'email obtinguda de SuiteCRM.
+
+If ("Contacte existeix?"): Comprova si la cerca anterior ha retornat algun resultat.
+
+Branca TRUE: El contacte existeix. El flux continua per actualitzar-lo.
+
+Branca FALSE: El contacte no existeix. El flux continuarà per crear-lo (lògica afegida durant la nostra sessió).
+
+Mautic Update... (Update / Create): Basant-se en el resultat del node If, actualitza el contacte existent o en crea un de nou a Mautic. Aquesta part gestiona intel·ligentment el camp email per evitar errors d'unicitat.
+
+Send Email: Envia una notificació d'èxit o error a l'administrador.

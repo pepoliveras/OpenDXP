@@ -1,0 +1,162 @@
+Integració OpenDXP: Flux 1 (WordPress → Mautic + SuiteCRM)
+Aquest document descriu la configuració i el funcionament del Flux 1, el workflow de n8n dissenyat per capturar les dades d'un formulari enviat des de WordPress i crear/actualitzar contactes de manera sincronitzada a Mautic i SuiteCRM.
+
+Aquest flux és el punt d'entrada principal de dades a l'ecosistema OpenDXP, automatitzant el procés de captació de leads o nous membres.
+
+Visió General del Flux
+L'objectiu d'aquest workflow és el següent:
+
+Un usuari omple i envia un formulari al lloc web de WordPress.
+
+WordPress envia les dades del formulari a un webhook de n8n.
+
+n8n rep les dades i executa dues branques en paral·lel:
+
+Branca Mautic: Comprova si el contacte ja existeix a Mautic (buscant per email). Si no existeix, el crea.
+
+Branca SuiteCRM: Comprova si el contacte ja existeix a SuiteCRM (buscant per email). Si no existeix, el crea.
+
+El flux envia notificacions per correu electrònic informant de l'èxit o l'error de l'operació.
+
+Prerequisits
+Abans d'implementar aquest flux, assegura't de tenir la següent configuració a punt:
+
+Instància de WordPress:
+
+Un lloc web de WordPress operatiu.
+
+Un plugin de formularis instal·lat que suporti webhooks (ex: WPForms, Gravity Forms, Contact Form 7 amb una extensió de webhooks).
+
+Instància de Mautic:
+
+Una instància de Mautic operativa.
+
+L'API ha d'estar habilitada (a Configuració > Configuració de l'API).
+
+Credencials d'API (OAuth2 és el recomanat) creades.
+
+Instància de SuiteCRM:
+
+Una instància de SuiteCRM operativa.
+
+Credencials de Client API (OAuth2) creades a l'àrea d'administració per permetre l'accés a n8n. Necessitaràs el Client ID i el Client Secret.
+
+Instància de n8n:
+
+Una instància de n8n operativa i accessible públicament per poder rebre webhooks.
+
+Configuració
+Pas 1: Configurar el Webhook a WordPress
+El primer pas és indicar-li a WordPress que enviï les dades del formulari a n8n.
+
+Importa el fitxer Flux1__WP____Mautic___CRM.json al teu n8n.
+
+Obre el workflow i fes clic al primer node, el Webhook.
+
+Copia la URL de Producció (Production URL).
+
+Ves a la configuració del teu formulari a WordPress. A la secció d'ajustos o notificacions, busca l'opció per a Webhooks.
+
+Enganxa la URL de producció de n8n en el camp corresponent. Assegura't que el mètode d'enviament sigui POST.
+
+Configura el formulari perquè enviï els camps amb noms clars (ex: firstName, lastName, email).
+
+Pas 2: Configurar les Credencials a n8n
+Aquest workflow necessita diverses credencials per poder connectar-se a les altres plataformes. Ves a la secció Credentials de n8n i configura les següents:
+
+Credencial de Mautic:
+
+Tipus: Mautic OAuth2 API.
+
+Introdueix la URL de la teva instància de Mautic, el Client ID i el Client Secret.
+
+Credencial SMTP:
+
+Tipus: SMTP.
+
+Configura les dades del teu servidor de correu per poder enviar les notificacions d'èxit o error.
+
+Credencial d'Autenticació del Webhook (Opcional però recomanat):
+
+El teu flux utilitza una Header Auth per seguretat.
+
+Tipus: Header Auth.
+
+Defineix un nom per a la capçalera (ex: X-N8N-AUTH) i un valor secret. Aquest mateix valor l'hauràs de configurar a la petició del webhook des de WordPress perquè només peticions autoritzades puguin executar el flux.
+
+Pas 3: Activar el Workflow
+Un cop hagis configurat les credencials i el webhook a WordPress, torna a n8n, assegura't que el workflow estigui Actiu i desa els canvis.
+
+Detalls del Funcionament del Workflow
+El fitxer Flux1__WP____Mautic___CRM.json implementa la següent lògica node per node:
+
+Webhook:
+
+Mètode: POST.
+
+Funció: Actua com a punt d'entrada. Rep les dades del formulari de WordPress (firstName, lastName, email, message, etc.).
+
+Edit Fields (Set):
+
+Funció: Prepara i neteja les dades rebudes. Assegura que els camps necessaris estiguin disponibles per a la resta de nodes.
+
+Branques Paral·leles: Des del node Edit Fields, el flux es divideix i executa les accions per a Mautic i SuiteCRM alhora.
+
+Branca Mautic
+Mautic (Search):
+
+Operació: Get All.
+
+Funció: Utilitza l'email rebut per buscar si ja existeix un contacte a Mautic.
+
+If:
+
+Condició: {{ $node["Mautic"].json.data.length }} > 0 (Comprova si la cerca anterior ha retornat algun resultat).
+
+Funció: Si el contacte ja existeix, el flux s'atura en aquesta branca (sortida TRUE). Si no existeix (sortida FALSE), continua cap al següent pas.
+
+Mautic1 (Create):
+
+Operació: Create.
+
+Funció: Si el node If determina que el contacte és nou, aquest node el crea a Mautic amb el nom, cognom i email rebuts.
+
+Send Email:
+
+Funció: Envia una notificació per correu confirmant que el contacte s'ha creat correctament a Mautic.
+
+Branca SuiteCRM
+HTTP Request1 (Get Token):
+
+Mètode: POST.
+
+Funció: Realitza una petició a l'API de SuiteCRM per obtenir un access_token temporal, necessari per a les següents peticions.
+
+HTTP Request2 (Search):
+
+Mètode: GET.
+
+Funció: Utilitza el token obtingut i l'email del formulari per buscar si el contacte ja existeix a SuiteCRM.
+
+Code (Parse Response):
+
+Funció: La resposta de l'API de SuiteCRM ve en format de text (string). Aquest node utilitza JSON.parse() per convertir-la en un objecte JSON manejable per a n8n.
+
+If2:
+
+Condició: {{ $json.results.length }} == 0 (Comprova si el resultat del parseig conté contactes).
+
+Funció: Si no s'ha trobat cap contacte (la llargada és 0), continua per la branca TRUE per crear-lo. Altrament, s'atura.
+
+HTTP Request3 (Create):
+
+Mètode: POST.
+
+Funció: Construeix un objecte JSON amb les dades del contacte i l'envia a l'API de SuiteCRM per crear el nou registre.
+
+Send Email2:
+
+Funció: Envia una notificació per correu confirmant que el contacte s'ha creat correctament a SuiteCRM.
+
+Gestió d'Errors
+Send ERROR mail: Aquest workflow inclou una gestió d'errors bàsica. Si qualsevol de les peticions a les APIs falla, es desvia el flux cap a aquest node, que envia un correu electrònic a l'administrador amb els detalls de l'error per a la seva revisió.

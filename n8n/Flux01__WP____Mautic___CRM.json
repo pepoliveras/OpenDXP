@@ -1,0 +1,171 @@
+{
+  "name": "Flux1: WP -> Mautic + CRM",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "canvia-aixo-per-un-path-unic",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-360, -20],
+      "id": "6d7b8585-0018-4198-a23b-183bc0251c07",
+      "name": "Webhook",
+      "webhookId": null,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "vp07As7vZRwN4gB4",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "aac14460-5c8b-4b3f-b39f-d205c69dd694", "name": "body.firstName", "value": "={{ $json.body.firstName }}", "type": "string" },
+            { "id": "985ef6c9-ec2d-43e2-8ff0-5334ffe9cc89", "name": "body.lastName", "value": "={{ $json.body.lastName }}", "type": "string" },
+            { "id": "49be8af7-8da4-4327-97fe-b79ac2e5b17d", "name": "body.email", "value": "={{ $json.body.email }}", "type": "string" },
+            { "id": "b19d584a-12c9-4f11-b019-5de28b49832d", "name": "body.message", "value": "={{ $json.body.message }}", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-180, -20],
+      "id": "76510550-853c-4840-ac0e-6abb1b5e381f",
+      "name": "Edit Fields",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": { "authentication": "oAuth2", "operation": "getAll", "options": { "search": "={{ $json.body.email }}" } },
+      "type": "n8n-nodes-base.mautic",
+      "typeVersion": 1,
+      "position": [80, 140],
+      "id": "99413adb-d7bc-427d-8260-82b07cbd844d",
+      "name": "Mautic",
+      "alwaysOutputData": true,
+      "credentials": { "mauticOAuth2Api": { "id": "bBWRQnN3FlPKd5VK", "name": "Mautic account" } }
+    },
+    {
+      "parameters": { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 }, "conditions": [ { "id": "3a4c4d34-0f5a-4cc2-90bd-d7120487425a", "leftValue": "={{ $node[\"Mautic\"].json.data.length }}", "rightValue": 0, "operator": { "type": "number", "operation": "gt" } } ], "combinator": "and" }, "looseTypeValidation": true, "options": {} },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [260, 140],
+      "id": "70c6d4a2-09a4-498e-ae2c-0dd9fb476b2b",
+      "name": "If",
+      "alwaysOutputData": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": { "authentication": "oAuth2", "email": "={{ $('Edit Fields').item.json.body.email }}", "firstName": "={{ $('Edit Fields').item.json.body.firstName }}", "lastName": "={{ $('Edit Fields').item.json.body.lastName }}", "additionalFields": {}, "options": {} },
+      "type": "n8n-nodes-base.mautic",
+      "typeVersion": 1,
+      "position": [480, 140],
+      "id": "2243334f-b3cf-4b38-bcbb-f25966cb7937",
+      "name": "Mautic1",
+      "credentials": { "mauticOAuth2Api": { "id": "bBWRQnN3FlPKd5VK", "name": "Mautic account" } }
+    },
+    {
+      "parameters": { "fromEmail": "notificacions@elteudomini.com", "toEmail": "admin@elteudomini.com", "subject": "Contacte creat a Mautic", "html": "=s'ha creat un nou contacte a Mautic:\n{{ $('Edit Fields').item.json.body.firstName }}\n{{ $('Edit Fields').item.json.body.lastName }}\n{{ $('Edit Fields').item.json.body.email }}", "options": {} },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [660, 140],
+      "id": "873f7f57-647f-42d9-8f01-951c81c8f3f8",
+      "name": "Send Email",
+      "webhookId": null,
+      "alwaysOutputData": true,
+      "credentials": { "smtp": { "id": "DqjAutnBM6baRQ5d", "name": "SMTP account" } },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": { "fromEmail": "notificacions@elteudomini.com", "toEmail": "admin@elteudomini.com", "subject": "Contacte creat a SuiteCRM", "html": "=s'ha creat un nou contacte a SuiteCRM:\n{{ $('Edit Fields').item.json.body.firstName }}\n{{ $('Edit Fields').item.json.body.lastName }}\n{{ $('Edit Fields').item.json.body.email }}", "options": {} },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1000, -320],
+      "id": "53226f3a-e653-4ffd-83b9-e6c600407c49",
+      "name": "Send Email2",
+      "webhookId": null,
+      "alwaysOutputData": true,
+      "credentials": { "smtp": { "id": "DqjAutnBM6baRQ5d", "name": "SMTP account" } },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://la-teva-url-de-suitecrm.com/legacy/Api/access_token",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "grant_type", "value": "client_credentials" },
+            { "name": "client_id", "value": "EL_TEU_CLIENT_ID" },
+            { "name": "client_secret", "value": "LA_TEVA_CONTRASENYA_SECRET" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [80, -260],
+      "id": "8cceca5c-2cf0-405c-9969-77203b81f5b5",
+      "name": "HTTP Request1",
+      "alwaysOutputData": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": { "url": "=https://la-teva-url-de-suitecrm.com/legacy/Api/V8/module/Contacts?filter[email1][eq]={{ $('Edit Fields').item.json.body.email }}", "sendHeaders": true, "headerParameters": { "parameters": [ { "name": "Content-Type", "value": "application/vnd.api+json" }, { "name": "Accept", "value": "application/vnd.api+json" }, { "name": "Authorization", "value": "=Bearer {{ $json.access_token }}" } ] }, "options": {} },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, -280],
+      "id": "e5fdd6db-669e-4050-b593-0eb364e129b8",
+      "name": "HTTP Request2",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": { "jsCode": "const inputItems = $input.all();\nconst outputItems = [];\n\nfor (let i = 0; i < inputItems.length; i++) {\n  const currentItem = inputItems[i];\n  const escapedJsonString = currentItem.json.data;\n  try {\n    const parsedInnerJson = JSON.parse(escapedJsonString);\n    const innerDataArray = parsedInnerJson.data;\n    outputItems.push({\n      json: {\n        results: innerDataArray\n      }\n    });\n  } catch (error) {\n    console.error(\"Error parsing JSON string:\", error, escapedJsonString);\n    outputItems.push({\n      json: {\n        error: \"Error parsing JSON\",\n        details: error.message,\n        originalString: escapedJsonString\n      }\n    });\n  }\n}\n\nreturn outputItems;" },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, -300],
+      "id": "6c17149e-6694-43c8-a00a-9e69b36e51e3",
+      "name": "Code"
+    },
+    {
+      "parameters": { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 }, "conditions": [ { "id": "be822e32-f2f1-44db-80de-5019d6a3696f", "leftValue": "={{ $json.results.length }}", "rightValue": 0, "operator": { "type": "number", "operation": "equals" } } ], "combinator": "and" }, "options": {} },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [600, -300],
+      "id": "018836af-72ee-4b0d-bf8a-e20810559230",
+      "name": "If2"
+    },
+    {
+      "parameters": { "method": "POST", "url": "=https://la-teva-url-de-suitecrm.com/legacy/Api/V8/module", "sendHeaders": true, "headerParameters": { "parameters": [ { "name": "Content-Type", "value": "application/vnd.api+json" }, { "name": "Accept", "value": "application/vnd.api+json" }, { "name": "Authorization", "value": "=Bearer {{ $('HTTP Request1').item.json.access_token }}" } ] }, "sendBody": true, "specifyBody": "json", "jsonBody": "={\n  \"data\": {\n    \"type\": \"Contacts\",\n    \"attributes\": {\n      \"first_name\": \"{{ $('Edit Fields').item.json.body.firstName }}\",\n      \"last_name\": \"{{ $('Edit Fields').item.json.body.lastName }}\",\n      \"email1\": \"{{ $('Edit Fields').item.json.body.email }}\"\n    }\n  }\n}", "options": {} },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [800, -320],
+      "id": "42165c6b-47b7-43c5-9c1e-584dcf5bcd4c",
+      "name": "HTTP Request3",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": { "fromEmail": "notificacions@elteudomini.com", "toEmail": "admin@elteudomini.com", "subject": "=ERROR en execució {{ $workflow.name }}", "html": "=Hi ha hagut un error en l'execució dins de N8N\n\n{{ $workflow.name }}\n\nHeaders:\n{{ $('Webhook').item.json.headers }}\n\nBody:\n{{ $('Webhook').item.json.body }}\n\n", "options": {} },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [-380, -300],
+      "id": "88106761-74fa-439a-9a0b-0f2186d6a633",
+      "name": "Send ERROR mail",
+      "webhookId": null,
+      "credentials": { "smtp": { "id": "DqjAutnBM6baRQ5d", "name": "SMTP account" } }
+    }
+  ],
+  "pinData": {},
+  "connections": {},
+  "active": false,
+  "settings": {},
+  "versionId": "32807866-816e-4cdb-a422-34d3d8a9f7b8",
+  "id": "QslLt5Zzlp8f1Ziy",
+  "tags": []
+}
