@@ -7,7 +7,7 @@ Aquest repositori conté el codi i la configuració del projecte **OpenDXP**, un
 
 OpenDXP (Open Digital Experience Platform) és una aproximació a les DXP que aprofita la flexibilitat i sostenibilitat del programari lliure. Va més enllà de la simple gestió de continguts o eines aïllades, permetent una visió holística de l'usuari i l'automatització de processos a través de diferents sistemes.
 
-## ✨ Components Principals (Prototip)
+## ✨ Components Integrats (Prototip)
 
 El prototip desenvolupat integra les següents eines:
 
@@ -15,6 +15,16 @@ El prototip desenvolupat integra les següents eines:
 * **SuiteCRM:** Sistema de Gestió de Relacions amb el Client (CRM) per a la base social.
 * **Mautic:** Eina d'Automatització de Màrqueting per a campanyes personalitzades.
 * **n8n:** Plataforma de Workflow Automation (middleware) que orquestra els fluxos de dades entre totes les eines mitjançant APIs.
+
+## 🗓️ Components Adicionals 
+
+A partir del prototip s'han afegit altres plataformes com són:
+
+* **Moodle:** Gestor de Continguts d'aprenentatge (LMS) Per a la gestió de l'aprenentatge en línia i la formació.
+* **Prestashop:** Sistema de Gestió de vendes (CMS) per a solucions de comerç electrònic.
+* **Mediawiki:** Plataforma de publicació de coneixement lliure i col·laboratiu (wiki).
+* **Koha:** Sistema Integral de Gestió Bibliotecària (SIGB) per a la gestió de catàlegm persones i prèstecs de biblioteques.
+
 
 ## ⚙️ Arquitectura i Tecnologies
 
@@ -38,7 +48,8 @@ Hem implementat i documentat fluxos essencials com:
 Aquest repositori inclou:
 
 * Fitxers `docker-compose.yml` per a cada servei.
-* Guia de configuració (enllaç a la memòria del TFG).
+* Guia de configuració (en els arxius d'explicació dins de cada carpeta).
+* Axius JSON amb els Fluxos d'integració per a N8N
 * Exemples de configuració de Traefik.
 
 
