@@ -56,6 +56,7 @@ Aquest repositori inclou:
 ## ✉️ Contacte
 
 Si tens preguntes o vols col·laborar, no dubtis en contactar amb nosaltres a http://www.opendxp.net
+
 Podeu consultar el document origen d'aquest projecte en aquest repositori de la UOC: https://openaccess.uoc.edu/handle/10609/152740
 
 ---
